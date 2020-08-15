@@ -1,0 +1,186 @@
+---
+title: "Stats Final Project-Slide"
+author: "Siddharth Gowda"
+date: "6/3/2020"
+output:
+  
+  slidy_presentation: default
+  ioslides_presentation: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo= TRUE)
+library(tidyverse)
+```
+
+# NFL Stats Project in R
+
+## Introduction
+
+What is R?
+
+---
+
+# Was there a correlation between a teams strength of schedule and their win percentage in the 2019 NFL season?
+
+```{r}
+AFC = read.csv("AFC_Data.csv")
+NFC = read.csv("NFC_Data.csv")
+head(AFC)
+head(NFC)
+NFL = rbind(AFC, NFC)
+tail(NFL)
+``` 
+Just loaded and combined the NFC and AFC datasets/dataframes into one set (from Pro Football Reference and converted into csv)
+
+---
+
+```{r}
+hist(NFL$W.L., main = "Histogram of Win % of NFL Teams 2019", 
+     xlab = "Win %", 
+     col = "Light Blue", xlim = c(0,1))
+hist(NFL$SoS, main = "Histogram of Strength of Schedule of NFL Teams 2019", 
+     xlab = "Strength of Schedule", col = "Light Blue", xlim = c(-2,3))
+```
+
+Strength of schedule?
+
+Win percentage?
+
+W.L. = Win percentage
+SoS = Strength of schedule
+
+Why did I plot a histogram: I wanted to see the distribution of the two variables and if there were apparent outliers and had a somewhat normal or symmetric distribution.
+
+---
+
+```{r}
+#Linear Regression
+NFL_WLSoS = lm(NFL$W.L. ~ NFL$SoS)
+summary(NFL_WLSoS)
+```
+Since the p-value (0.4989) is greater than alpha = 0.05 we fail to reject the null hypothesis. At alpha = 0.05 there is no significant evidence that there is a linear relationship between the strength of schedule and the win percentage of an NFL team in 2019. However, these calculations provide some evidence to the motto "any given Sunday" because the lack of evidence for a linear relationships suggests that perhaps upset occur frequently in the NFL. This is a question that I would investigate further if I had more time.
+
+```{r}
+plot(NFL$SoS, NFL$W.L., 
+     xlab = "NFL SoS", 
+     ylab = "NFL Win %", 
+     main = "NFL Strength of Schedule agaisnt Win % 2019", 
+     pch = 19, 
+     col = "light blue")
+with(NFL, text(NFL$W.L. ~ NFL$SoS, 
+               labels=Tm, 
+               pos=4, 
+               cex=.4))
+abline(NFL_WLSoS)
+```
+
+---
+
+```{r}
+res_NFL_WLSoS = residuals(NFL_WLSoS)
+plot(NFL$SoS, res_NFL_WLSoS, main = "Residual Plot", xlab = "NFL SoS", ylab = "Residuals")
+with(NFL, text(res_NFL_WLSoS ~ NFL$SoS, labels=Tm, pos=4, cex=.4))
+abline(h = 0)
+```
+
+---
+
+# Was there a correlation between the win percentage of a NFL team and their point differential in 2019?
+
+```{r}
+hist(NFL$PD, breaks = 8, main = "Histogram of NFL Point Differential 2019", 
+     xlab = "Point Differential", 
+     col = "Light Blue", xlim = c(-200, 300))
+```
+PD = Point Differential
+
+---
+
+```{r}
+# Linear Regression
+NFL_WLPD = lm(NFL$W.L. ~ NFL$PD)
+summary(NFL_WLPD)
+```
+
+Since the p-value (4.567*10-11) is less than aplha = 0.05 we reject the null hypothesis. At alpha = 0.05 there is statistically evidence that suggests that the relationship between point differential and NFL Win % in the 2019 season could be a positive linear relationship.
+
+---
+
+```{r}
+plot(NFL$PD, NFL$W.L., 
+     xlab = "Point Differential", 
+     ylab = "NFL Win %", 
+     main = "Point Differential against Win % NFL 2019", 
+     pch = 19, 
+     col = "light blue")
+with(NFL, text(NFL$W.L. ~ NFL$PD, 
+               labels=Tm, 
+               pos=4, 
+               cex = .4))
+abline(NFL_WLPD)
+```
+
+---
+
+```{r}
+res_WLPD = residuals(NFL_WLPD)
+plot(NFL$PD, 
+     res_WLPD, 
+     main = "Residual Plot",
+     xlab = "NFL Point Differential", 
+     ylab = "Residual Plot")
+with(NFL, text(res_WLPD ~ NFL$PD, labels=Tm, pos=4, cex = .4))
+abline(h = 0)
+```
+
+---
+
+# Finding Clusters
+
+```{r}
+NFL_cluster = read.csv("cluster_NFL_reducedvariables4.csv")
+head(NFL_cluster)
+```
+Over fitting a model.
+
+Why I removed some variables?
+
+---
+
+Normalization (Z-score)
+```{r}
+z = NFL_cluster[, -c(1,1)]
+m = apply(z,2,mean) # Find means
+s = apply(z,2,sd) # Find Standard devs
+z = scale(z,m,s) # Z-score
+```
+2 = columns
+
+Euclidean Distance (distance formula with 4 variables)
+```{r}
+d = dist(z)
+print(d, digits = 3)
+```
+
+Example: team x and y = [(x.w%-y.w%)^2 + (x.PD-y.PD)^2 + (x.OSRS-y.OSRS)^2 + (x.DSRS-y.PDSRS)^2)]^.5 but calculate for every team against every other team
+
+---
+
+Cluster Dendrogram
+
+```{r}
+hc_c = hclust(d)
+plot(hc_c,labels = NFL_cluster$Tm, cex = .6, xlab = "Franchise Names")
+plot(hc_c, hang = -1, 
+     labels = NFL_cluster$Tm, 
+     cex = .6, 
+     xlab = "Franchise Names")
+```
+Complete Linkage Used (means smaller clusters are used to create bigger ones)
+This means that the algorithm is finding the two, in this case, teams that have the closest overall z-scores.
+
+Height = The number of levels in the dendrogram
+
+Three Clusters?

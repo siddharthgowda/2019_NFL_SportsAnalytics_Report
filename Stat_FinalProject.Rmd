@@ -1,0 +1,265 @@
+---
+title: "Stats Final Project"
+author: "Siddharth Gowda"
+date: "6/3/2020"
+output:
+  slidy_presentation: default
+  ioslides_presentation: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo= TRUE)
+library(pacman)
+library(datasets)
+library(tidyverse)
+p_load(psych)
+library(pacman)
+p_load(GGally)
+```
+
+
+# NFL Stats Project
+
+## Introduction
+
+For my final project I decided to learn how to use R. R is a statistical programming language that despite being basic is extremely useful for statisticians. I'm learning almost from scratch so I will mostly be doing simple plotting and analysis on the 2019 NFL statistics per team.
+
+---
+
+# Was there a correlation between a teams strength of schedule and their win percentage in the 2019 NFL season?
+
+```{r}
+AFC = read.csv("AFC_Data.csv")
+NFC = read.csv("NFC_Data.csv")
+head(AFC)
+head(NFC)
+NFL = rbind(AFC, NFC)
+tail(NFL)
+``` 
+Just loaded and combined the NFC and AFC datasets/dataframes into one set (from Pro Football Reference and converted into csv)
+
+---
+
+```{r}
+hist(NFL$W.L., main = "Histogram of Win Percentage of NFL Teams 2019", 
+     xlab = "Win Percentage", 
+     col = "Light Blue", xlim = c(0,1))
+hist(NFL$SoS, main = "Histogram of Strength of Schedule of NFL Teams 2019", 
+     xlab = "Strength of Schedule", col = "light blue", xlim = c(-2,3))
+```
+Strength of schedule measures the average difficultly of each opponent the team plays. It is a statistics calculated by Football Reference that is usually centered around 0 and approximately symmetric (although it is not that apparent in this graph).
+
+Win percentage is typically centered around 0.5 and is approximately symmetric.
+
+W.L. = Win percentage
+SoS = Strength of schedule
+
+Why did I plot a histogram: I wanted to see the distribution of the two variables and if there were apparent outliers.
+
+---
+
+```{r}
+#Linear Regression
+NFL_WLSoS = lm(NFL$W.L. ~ NFL$SoS)
+summary(NFL_WLSoS)
+cor(NFL$SoS, NFL$W.L.)
+```
+Since the p-value (0.4989) is greater than alpha = 0.05 we fail to reject the null hypothesis. At alpha = 0.05 there is no significant evidence that there is a linear relationship between the strength of schedule and the win percentage of an NFL team in 2019. However, these calculations provide some evidence to the motto "any given Sunday" because the lack of evidence for a linear relationships suggests that perhaps upset occur frequently in the NFL. This is a question that I would investigate further if I had more time.
+
+
+```{r}
+plot(NFL$SoS, NFL$W.L., 
+     xlab = "NFL SoS", 
+     ylab = "NFL Win Percentage", 
+     main = "NFL Strength of Schedule Against Win Percentage 2019", 
+     pch = 19, 
+     col = "light blue")
+with(NFL, text(NFL$W.L. ~ NFL$SoS, 
+               labels=Tm, 
+               pos=4, 
+               cex=.4))
+abline(NFL_WLSoS)
+```
+
+---
+
+```{r}
+res_NFL_WLSoS = residuals(NFL_WLSoS)
+plot(NFL$SoS, res_NFL_WLSoS, main = "Residual Plot", xlab = "NFL SoS", ylab = "Residuals")
+with(NFL, text(res_NFL_WLSoS ~ NFL$SoS, labels= NFL$Tm, pos=4, cex=.4))
+abline(h = 0)
+```
+Despite the fact that there does not appear to be a linear relationship between the two variables, there seems to be random scatter in the residual plot.
+
+---
+
+# Was there a correlation between the win percentage of a NFL team and their point differential in 2019?
+
+```{r}
+hist(NFL$PD, breaks = 8, main = "Histogram of NFL Point Differential 2019", 
+     xlab = "Point Differential", 
+     col = "Light Blue", xlim = c(-200, 300))
+```
+PD = Point Differential (the sum of all of the points a team scores subtracted by all the points the team surrenders over the season, typically centered around 0 and approximately symmetric)
+
+---
+
+```{r}
+# Linear Regression
+NFL_WLPD = lm(NFL$W.L. ~ NFL$PD)
+summary(NFL_WLPD)
+cor(NFL$PD, NFL$W.L.)
+```
+
+Since the p-value (4.567*10^-11) is less than aphla = 0.05 we reject the null hypothesis. At alpha = 0.05 there is statistically evidence that suggests that the relationship between point differential and NFL Win % in the 2019 season could be a positive linear relationship.
+
+---
+
+```{r}
+plot(NFL$PD, NFL$W.L., 
+     xlab = "Point Differential", 
+     ylab = "NFL Win Percentage", 
+     main = "Point Differential against Win Percentage NFL 2019", 
+     pch = 19, 
+     col = "light blue")
+with(NFL, text(NFL$W.L. ~ NFL$PD, 
+               labels=Tm, 
+               pos=4, 
+               cex = .4))
+abline(NFL_WLPD)
+
+
+#range(NFL$PD)
+```
+
+---
+
+```{r}
+res_WLPD = residuals(NFL_WLPD)
+plot(NFL$PD, 
+     res_WLPD, 
+     main = "Residual Plot",
+     xlab = "NFL Point Differential", 
+     ylab = "Residual Plot")
+with(NFL, text(res_WLPD ~ NFL$PD, labels=Tm, pos=4, cex = .4))
+abline(h = 0)
+```
+The residual plot is pretty evenly scattered, which supports the fact that a relationship between the point differential and win % in the 2019 NFL season could be linear.
+
+---
+
+# Finding Clusters
+
+```{r}
+NFL_cluster = read.csv("cluster_NFL_reducedvariables4.csv")
+head(NFL_cluster)
+```
+I removed some of the variables so the clustering model would not over-fit. This occurs because as the number of variables increases, out-off sample error (model error) decreases but then increases. This is true since some variables should have a greater impact on the model. 
+
+I removed points scored by opposition, points scored by team, and margin of victory since those variables are similar to point differential. Also, win loss count of was similar to win % and the SRS = OSRS + DSRS; thus, I removed those two variables as well. Strength of schedule was removed because it seems to have a weak relationship with the other variables, and therefore is not a good variable to cluster teams with.
+
+---
+
+Normalization (Z-score)
+```{r}
+z = NFL_cluster[, -c(1,1)]
+m = apply(z,2,mean) # Find means
+s = apply(z,2,sd) # Find Standard devs
+z1 = scale(z,m,s) # Z-score
+```
+2 = columns
+
+Euclidean Distance (distance formula with 4 variables)
+```{r}
+d = dist(z1)
+print(d, digits = 3)
+```
+
+Example: team x and y = [(x.w%-y.w%)^2 + (x.PD-y.PD)^2 + (x.OSRS-y.OSRS)^2 + (x.DSRS-y.PDSRS)^2)]^.5 but calculate for every team against every other team
+
+---
+
+Cluster Dendrogram
+
+```{r}
+hc_c = hclust(d)
+plot(hc_c,labels = NFL_cluster$Tm, cex = .6, xlab = "Franchise Names")
+plot(hc_c, hang = -1, 
+     labels = NFL_cluster$Tm, 
+     cex = .6, 
+     xlab = "Franchise Names")
+rect.hclust(hc_c, k=3, border = "dark green")
+```
+Complete Linkage Used (means smaller clusters are used to create bigger ones)
+This means that the algorithm is finding the two, in this case, teams that have the closest overall z-scores.
+
+Height = The number of levels in the dendrogram
+
+Based on the diagram, there are three main clusters, in my opinion: Baltimore to Kansas City (the elite teams), Buffalo to Houston (best of the non-playoff teams and lower-end play-off teams), and Miami to Indianapolis (non-playoff teams). However, there are some potential anomalies like the Broncos and Bears in the second group.
+```{r}
+t = cor(NFL_cluster[, -c(1,1)])
+t
+```
+
+#Density Curve
+```{r}
+ggpairs(NFL_cluster, cardinality_threshold = Inf)
+```
+
+Isolating
+
+```{r}
+NFL %>% select(Tm, W.L., PD, DSRS, OSRS) %>% 
+  filter(W.L. > .5, PD > 0) %>% mutate(SRS = OSRS + DSRS) %>%
+  mutate(MOV = PD/16) %>%
+  group_by(W.L. > .7) %>%
+  summarise(Med_MOV = median(MOV))
+
+NFL_test = NFL %>% select(Tm, W.L., PD, DSRS, OSRS) %>% 
+  filter(W.L. > .5, PD > 0) %>% mutate(SRS = OSRS + DSRS) %>%
+  mutate(MOV = PD/16) %>%
+  filter(DSRS > 2 & OSRS > 2)
+print(NFL_test)
+
+NFL1 = NFL %>% select(Tm, W.L., PD, DSRS, OSRS) %>% 
+  filter(W.L. > .5, PD > 0) %>% mutate(SRS = OSRS + DSRS) %>%
+  mutate(MOV = PD/16) %>%
+  filter(DSRS > 2 & OSRS > 2)
+hist(NFL1$W.L., breaks = 8)
+
+NFL2 = NFL %>% select(Tm, W.L., PD, DSRS, OSRS) %>% 
+  filter(W.L. > .5, PD > 0) %>% mutate(SRS = OSRS + DSRS) %>%
+  mutate(MOV = PD/16) %>%
+  filter(DSRS < 2 & OSRS < 2)
+hist(NFL2$W.L., breaks = 2)
+
+print(NFL2)
+```
+
+```{r}
+NFL_DF = NFL %>% select(Tm, W.L., PD, DSRS, OSRS) %>%  
+  mutate(SRS = OSRS + DSRS) %>%
+  mutate(MOV = PD/16) %>%
+  filter(DSRS > 4)
+median(NFL_DF$W.L.)
+
+NFL_OF = NFL %>% select(Tm, W.L., PD, DSRS, OSRS) %>%  
+  mutate(SRS = OSRS + DSRS) %>%
+  mutate(MOV = PD/16) %>%
+  filter(OSRS > 4)
+median(NFL_OF$W.L.)
+
+NFL_AR = NFL %>% select(Tm, W.L., PD, DSRS, OSRS) %>%  
+  mutate(SRS = OSRS + DSRS) %>%
+  mutate(MOV = PD/16) %>%
+  filter(SRS > 8)
+median(NFL_AR$W.L.)
+
+print(NFL_DF)
+
+print(NFL_OF)
+
+print(NFL_AR)
+
+```
